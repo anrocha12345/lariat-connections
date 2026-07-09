@@ -20,12 +20,13 @@ import {
 import { getStorage } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-storage.js";
 
 export const firebaseConfig = {
-  apiKey:            "PASTE_API_KEY",
-  authDomain:        "PASTE_PROJECT.firebaseapp.com",
-  projectId:         "PASTE_PROJECT",
-  storageBucket:     "PASTE_PROJECT.firebasestorage.app",
-  messagingSenderId: "PASTE_SENDER_ID",
-  appId:             "PASTE_APP_ID",
+  apiKey:            "AIzaSyD3SeKfto6eZUihCXb6dx8YFJH0PgdunYQ",
+  authDomain:        "lariat-connections.firebaseapp.com",
+  projectId:         "lariat-connections",
+  storageBucket:     "lariat-connections.firebasestorage.app",
+  messagingSenderId: "418135332739",
+  appId:             "1:418135332739:web:d2536072877618f39e88b6",
+  measurementId:     "G-NWR4WD4XMQ",
 };
 
 // True once real values are in place. Pages check this to show a setup notice.
