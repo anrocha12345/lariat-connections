@@ -1,0 +1,43 @@
+rules_version = '2';
+// ─────────────────────────────────────────────────────────────────────────
+// Lariat Connections — Firestore security rules
+// The REAL security boundary. The browser talks to Firestore directly, so these
+// rules — not any client-side check — decide who can read/write. Every data doc
+// is scoped to a `spaceId`; access requires being a member of that space.
+// (Lesson from Douro #1/#2/#3: never gate data on "merely authenticated".)
+// ─────────────────────────────────────────────────────────────────────────
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+
+    function isMemberOf(spaceId) {
+      return signedIn()
+        && request.auth.uid in get(/databases/$(database)/documents/spaces/$(spaceId)).data.members;
+    }
+    // Existing doc belongs to a space the caller is a member of
+    function readable() { return isMemberOf(resource.data.spaceId); }
+    // Incoming doc is stamped with a space the caller is a member of
+    function writable() { return isMemberOf(request.resource.data.spaceId); }
+
+    // Spaces: the access-control unit. A user may read/modify a space they belong
+    // to, and may create a space only if they are its owner and first member.
+    match /spaces/{spaceId} {
+      allow read:          if signedIn() && request.auth.uid in resource.data.members;
+      allow update, delete: if signedIn() && request.auth.uid in resource.data.members;
+      allow create:        if signedIn()
+                            && request.auth.uid == request.resource.data.ownerUid
+                            && request.auth.uid in request.resource.data.members;
+    }
+
+    // All data collections share the same space-membership gate.
+    match /people/{id}        { allow read, update, delete: if readable(); allow create: if writable(); }
+    match /experiences/{id}   { allow read, update, delete: if readable(); allow create: if writable(); }
+    match /companies/{id}     { allow read, update, delete: if readable(); allow create: if writable(); }
+    match /interactions/{id}  { allow read, update, delete: if readable(); allow create: if writable(); }
+    match /relationships/{id} { allow read, update, delete: if readable(); allow create: if writable(); }
+    match /events/{id}        { allow read, update, delete: if readable(); allow create: if writable(); }
+    match /tags/{id}          { allow read, update, delete: if readable(); allow create: if writable(); }
+    match /userConfig/{id}    { allow read, update, delete: if readable(); allow create: if writable(); }
+  }
+}

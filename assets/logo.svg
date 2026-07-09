@@ -1,0 +1,11 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Lariat Connections">
+  <!-- Lasso loop -->
+  <ellipse cx="32" cy="26" rx="19" ry="15" fill="none" stroke="#C25E3C" stroke-width="4"
+           stroke-dasharray="3 3.4" transform="rotate(-8 32 26)"/>
+  <!-- Knot -->
+  <circle cx="47" cy="34" r="4.2" fill="#C25E3C"/>
+  <!-- Trailing rope -->
+  <path d="M47 38 C 50 46, 44 52, 38 55 C 33 57, 27 57, 22 60"
+        fill="none" stroke="#2E5E4E" stroke-width="4" stroke-linecap="round"
+        stroke-dasharray="3 3.4"/>
+</svg>

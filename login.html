@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in — Lariat Connections</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    body { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: var(--shadow); padding: 44px 38px; width: 100%; max-width: 420px; text-align: center; }
+    .login-card img.logo { width: 64px; height: 64px; margin: 0 auto 20px; }
+    .login-card h1 { font-size: 1.7rem; color: var(--primary); margin-bottom: 6px; }
+    .subtitle { color: var(--text-light); font-size: 0.92rem; margin-bottom: 28px; line-height: 1.55; }
+    .form-group { text-align: left; margin-bottom: 16px; }
+    .sent-notice { background: var(--accent-soft); border: 1px solid #C5DCD1; border-radius: var(--radius-sm);
+      padding: 16px 18px; color: var(--accent); font-size: 0.9rem; line-height: 1.55; }
+    .sent-notice__icon { font-size: 1.6rem; margin-bottom: 6px; }
+    .sent-notice__email { display: inline-block; font-weight: 700; color: var(--primary); word-break: break-all; margin: 2px 0 6px; }
+    .msg-error { margin-top: 16px; padding: 13px 15px; border-radius: var(--radius-sm); font-size: 0.88rem;
+      display: none; text-align: left; background: #FBE9E9; color: var(--danger); border: 1px solid #F0C0C0; }
+    .msg-info { margin-top: 16px; padding: 13px 15px; border-radius: var(--radius-sm); font-size: 0.88rem;
+      background: var(--accent-soft); color: var(--accent); border: 1px solid #C5DCD1; }
+    .setup-warn { margin-top: 18px; padding: 14px; border-radius: var(--radius-sm); font-size: 0.84rem;
+      background: #FBF2DE; color: var(--warn); border: 1px solid #EBD9AE; text-align: left; line-height: 1.5; display: none; }
+    .back { margin-top: 26px; }
+    .back a { font-size: 0.85rem; color: var(--text-light); }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <img src="assets/logo.svg" alt="Lariat Connections" class="logo">
+    <h1>Lariat Connections</h1>
+
+    <div id="formView">
+      <p class="subtitle">Enter your email and we'll send you a secure, one-time sign-in link. No password needed.</p>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="email">Email address</label>
+          <input type="email" id="email" placeholder="you@email.com" required autocomplete="email">
+        </div>
+        <button type="submit" class="btn btn--block" id="submitBtn">Send sign-in link</button>
+      </form>
+      <div id="errorMsg" class="msg-error"></div>
+      <div id="setupWarn" class="setup-warn">
+        ⚠ <strong>Firebase not configured yet.</strong> Paste your project config into
+        <code>js/firebase-config.js</code> before sign-in will work.
+      </div>
+    </div>
+
+    <div id="sentView" class="hidden" style="margin-top:24px;">
+      <div class="sent-notice">
+        <div class="sent-notice__icon">📬</div>
+        <div>We've sent a sign-in link to<br><span class="sent-notice__email" id="sentEmail"></span></div>
+        <div style="font-size:0.8rem;margin-top:8px;">Don't see it? Check your <strong>spam</strong> folder.</div>
+      </div>
+      <button class="btn btn--block" id="resendBtn" style="margin-top:18px;">Resend link</button>
+      <button class="btn btn--ghost btn--block" id="differentEmailBtn" style="margin-top:10px;">Use a different email</button>
+      <div id="resendMsg" class="hidden" style="margin-top:12px;font-size:0.82rem;color:var(--accent);">✓ Link resent.</div>
+    </div>
+
+    <div id="processingView" class="hidden">
+      <h1>Signing you in…</h1>
+      <p class="subtitle">Verifying your link.</p>
+      <div class="msg-info">Please wait…</div>
+    </div>
+
+    <div class="back"><a href="index.html">← Back to home</a></div>
+  </div>
+
+  <script type="module">
+    import { auth, IS_CONFIGURED } from "./js/firebase-config.js";
+    import {
+      sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
+
+    const APP_URL   = new URL("app.html",   window.location.href).href;
+    const LOGIN_URL = new URL("login.html", window.location.href).href;
+    const actionCodeSettings = { url: LOGIN_URL, handleCodeInApp: true };
+
+    const $ = (id) => document.getElementById(id);
+    let sentToEmail = "";
+
+    function showForm()       { $("formView").classList.remove("hidden"); $("sentView").classList.add("hidden"); $("processingView").classList.add("hidden"); }
+    function showSent(email)  { $("formView").classList.add("hidden"); $("sentView").classList.remove("hidden"); $("processingView").classList.add("hidden"); $("sentEmail").textContent = email; }
+    function showProcessing() { $("formView").classList.add("hidden"); $("sentView").classList.add("hidden"); $("processingView").classList.remove("hidden"); }
+
+    if (!IS_CONFIGURED) {
+      $("setupWarn").style.display = "block";
+      $("submitBtn").disabled = true;
+    }
+
+    // Already signed in (and not mid-callback) → go to app
+    onAuthStateChanged(auth, (user) => {
+      if (user && !isSignInWithEmailLink(auth, window.location.href)) {
+        window.location.href = APP_URL;
+      }
+    });
+
+    // Handle the magic-link callback
+    if (isSignInWithEmailLink(auth, window.location.href)) {
+      showProcessing();
+      let email = window.localStorage.getItem("emailForSignIn");
+      if (!email) email = window.prompt("Please confirm your email to finish signing in:");
+      if (email) {
+        signInWithEmailLink(auth, email, window.location.href)
+          .then(() => { window.localStorage.removeItem("emailForSignIn"); window.location.href = APP_URL; })
+          .catch((err) => {
+            showForm();
+            const e = $("errorMsg");
+            e.textContent = "Sign-in failed: " + (err.message || "Invalid or expired link. Request a new one.");
+            e.style.display = "block";
+          });
+      } else { showForm(); }
+    }
+
+    async function sendLink(email) {
+      await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+      window.localStorage.setItem("emailForSignIn", email);
+    }
+
+    $("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = $("email").value.trim();
+      const btn = $("submitBtn"), err = $("errorMsg");
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Sending…'; err.style.display = "none";
+      try {
+        await sendLink(email); sentToEmail = email; showSent(email); $("loginForm").reset();
+      } catch (ex) {
+        err.textContent = ex.message || "Something went wrong. Please try again."; err.style.display = "block";
+      } finally { btn.disabled = false; btn.textContent = "Send sign-in link"; }
+    });
+
+    $("resendBtn").addEventListener("click", async () => {
+      const btn = $("resendBtn"), msg = $("resendMsg");
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Resending…'; msg.classList.add("hidden");
+      try { await sendLink(sentToEmail); msg.classList.remove("hidden"); }
+      catch { msg.textContent = "Failed to resend."; msg.style.color = "var(--danger)"; msg.classList.remove("hidden"); }
+      finally { btn.disabled = false; btn.textContent = "Resend link"; }
+    });
+
+    $("differentEmailBtn").addEventListener("click", () => {
+      sentToEmail = ""; window.localStorage.removeItem("emailForSignIn"); showForm();
+    });
+  </script>
+</body>
+</html>

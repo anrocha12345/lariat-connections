@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lariat Connections</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__brand">
+        <img src="assets/logo.svg" alt="" class="sidebar__brand-mark">
+        <span class="sidebar__brand-name">Lariat</span>
+      </div>
+      <nav class="nav" id="nav">
+        <button class="nav__item" data-view="dashboard"><span class="nav__icon">🏠</span> Dashboard</button>
+        <button class="nav__item" data-view="people"><span class="nav__icon">👤</span> People</button>
+        <button class="nav__item" data-view="companies"><span class="nav__icon">🏢</span> Companies</button>
+        <button class="nav__item" data-view="calendar"><span class="nav__icon">🗓️</span> Calendar</button>
+        <button class="nav__item" data-view="map"><span class="nav__icon">🕸️</span> Map</button>
+        <button class="nav__item" data-view="import"><span class="nav__icon">📥</span> Import</button>
+        <button class="nav__item" data-view="settings"><span class="nav__icon">⚙️</span> Settings</button>
+      </nav>
+      <div class="sidebar__foot">
+        <div class="muted small" id="userEmail" style="margin-bottom:8px;word-break:break-all"></div>
+        <button class="btn btn--ghost btn--sm btn--block" id="signOutBtn">Sign out</button>
+      </div>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <div class="row">
+          <button class="btn btn--ghost btn--sm" id="menuBtn" style="display:none">☰</button>
+          <h1 class="topbar__title" id="viewTitle">Dashboard</h1>
+        </div>
+        <div class="row" id="topbarActions"></div>
+      </div>
+      <div class="content" id="content">
+        <div class="empty"><span class="spinner spinner--dark"></span> Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth, doSignOut } from "./js/auth.js";
+    import { IS_CONFIGURED } from "./js/firebase-config.js";
+
+    const content   = document.getElementById("content");
+    const titleEl   = document.getElementById("viewTitle");
+    const actionsEl = document.getElementById("topbarActions");
+    const navEl     = document.getElementById("nav");
+
+    const VIEWS = {
+      dashboard: { title: "Dashboard", mod: "./js/views/dashboard.js" },
+      people:    { title: "People",    mod: "./js/views/people.js" },
+      companies: { title: "Companies", mod: "./js/views/companies.js" },
+      calendar:  { title: "Calendar",  mod: "./js/views/calendar.js" },
+      map:       { title: "Map",       mod: "./js/views/map.js" },
+      import:    { title: "Import",    mod: "./js/views/import.js" },
+      settings:  { title: "Settings",  mod: "./js/views/settings.js" },
+    };
+
+    if (!IS_CONFIGURED) {
+      content.innerHTML = `<div class="empty"><div class="empty__icon">⚙️</div>
+        <h2>Firebase isn't configured yet</h2>
+        <p class="muted">Paste your project config into <code>js/firebase-config.js</code>, then reload.</p></div>`;
+      throw new Error("Not configured");
+    }
+
+    const ctx = await requireAuth();
+    document.getElementById("userEmail").textContent = ctx.user.email || "";
+    document.getElementById("signOutBtn").onclick = doSignOut;
+
+    let currentCleanup = null;
+
+    // Minimal router: reads #view from the hash, mounts the matching module.
+    async function route() {
+      const raw = location.hash.replace("#", "") || "dashboard";
+      const [view, param] = raw.split("/");
+      const def = VIEWS[view] || VIEWS.dashboard;
+
+      // Highlight nav
+      navEl.querySelectorAll(".nav__item").forEach((b) =>
+        b.classList.toggle("active", b.dataset.view === view));
+      titleEl.textContent = def.title;
+      actionsEl.innerHTML = "";
+
+      // Tear down previous view's listeners
+      if (typeof currentCleanup === "function") { try { currentCleanup(); } catch {} }
+      currentCleanup = null;
+
+      content.innerHTML = `<div class="empty"><span class="spinner spinner--dark"></span> Loading…</div>`;
+      try {
+        const mod = await import(def.mod);
+        currentCleanup = await mod.mount({ content, actions: actionsEl, ctx, go, param }) || null;
+      } catch (err) {
+        console.error(err);
+        content.innerHTML = `<div class="empty"><div class="empty__icon">🚧</div>
+          <h2>${def.title} — coming together</h2>
+          <p class="muted">${(err && err.message) || "This view isn't available yet."}</p></div>`;
+      }
+    }
+
+    // Navigate programmatically (views use this, e.g. open a person)
+    function go(view, params = {}) {
+      const q = params.id ? `/${params.id}` : "";
+      location.hash = view + q;
+    }
+
+    navEl.addEventListener("click", (e) => {
+      const btn = e.target.closest(".nav__item");
+      if (btn) location.hash = btn.dataset.view;
+    });
+    window.addEventListener("hashchange", route);
+
+    // Mobile menu toggle
+    const menuBtn = document.getElementById("menuBtn");
+    const sidebar = document.getElementById("sidebar");
+    const mq = window.matchMedia("(max-width: 780px)");
+    const applyMq = () => { menuBtn.style.display = mq.matches ? "inline-flex" : "none"; };
+    mq.addEventListener("change", applyMq); applyMq();
+    menuBtn.onclick = () => sidebar.classList.toggle("open");
+
+    route();
+  </script>
+</body>
+</html>

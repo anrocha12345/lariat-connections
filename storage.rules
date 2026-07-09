@@ -1,0 +1,25 @@
+rules_version = '2';
+// ─────────────────────────────────────────────────────────────────────────
+// Lariat Connections — Storage security rules
+// Contact photos live under photos/{spaceId}/{file}. Only members of a space
+// may read/write its photos. Uploads must be images and under 5 MB
+// (Douro lessons #6/#10: lock reads, validate content-type + size).
+// ─────────────────────────────────────────────────────────────────────────
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isMemberOf(spaceId) {
+      return request.auth != null
+        && request.auth.uid in
+           firestore.get(/databases/(default)/documents/spaces/$(spaceId)).data.members;
+    }
+
+    match /photos/{spaceId}/{fileName} {
+      allow read:  if isMemberOf(spaceId);
+      allow write: if isMemberOf(spaceId)
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if isMemberOf(spaceId);
+    }
+  }
+}

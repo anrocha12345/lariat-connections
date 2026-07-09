@@ -1,0 +1,13 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+
+# Local env / notes
+.env
+*.local
+
+# Sample data exports (don't commit personal contacts)
+Connections.csv
+*_Connections.csv
+sample-data/
