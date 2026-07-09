@@ -19,6 +19,7 @@ const TYPES = {
   met_in_person: { label: "Met in person",   icon: "👥", contact: true  },
   coffee:        { label: "Coffee / meal",   icon: "☕", contact: true  },
   event:         { label: "Event",           icon: "🎉", contact: true  },
+  linkedin_message: { label: "LinkedIn message", icon: "💬", contact: true },
   other:         { label: "Other",           icon: "•",  contact: false },
 };
 
