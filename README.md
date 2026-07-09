@@ -10,7 +10,7 @@ no code, repo, or Firebase project with it.
 ## Stack
 - **Static site** — vanilla HTML/CSS/JS, Firebase modular SDK via CDN. No build step.
 - **Firebase** — Auth (passwordless magic link), Firestore (data), Storage (photos).
-- **Hosting** — GitHub Pages (`aninse123.github.io/lariat-connections/`).
+- **Hosting** — GitHub Pages (`anrocha12345.github.io/lariat-connections/`).
 - **Libraries (CDN)** — PapaParse (CSV import), Cytoscape.js (map), FullCalendar (calendar).
 
 ## One-time setup
@@ -22,7 +22,7 @@ no code, repo, or Firebase project with it.
 4. **Storage** → create, region `europe-west1`.
 5. Project settings → **Your apps** → add a **Web app** → copy the config object into
    [`js/firebase-config.js`](js/firebase-config.js) (replace the `PASTE_*` values).
-6. **Authentication → Settings → Authorized domains** → add `aninse123.github.io`
+6. **Authentication → Settings → Authorized domains** → add `anrocha12345.github.io`
    (and `localhost` for local testing; it's usually there by default).
 7. Publish the security rules: paste [`firestore.rules`](firestore.rules) into
    Firestore → Rules, and [`storage.rules`](storage.rules) into Storage → Rules.
@@ -31,7 +31,11 @@ no code, repo, or Firebase project with it.
 ### 2. GitHub Pages
 1. Create a repo named **`lariat-connections`** and push this folder to `main`.
 2. Repo → Settings → **Pages** → Source: **Deploy from a branch**, branch **main / root**.
-3. Live at `https://aninse123.github.io/lariat-connections/`.
+3. Live at `https://anrocha12345.github.io/lariat-connections/`.
+
+> Note: hosted under the **anrocha12345** account. The `aninse123` account can't host it
+> cleanly because its Pages custom domain (`douropartners.pt`) is inherited by all its project
+> sites, and that domain points to Netlify — so a `lariat-connections` repo there is unreachable.
 
 ## Local development
 Serve the folder over http (module scripts need it — `file://` won't work):
