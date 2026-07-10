@@ -77,18 +77,22 @@ export function watchBySpace(col, cb, ...constraints) {
 }
 
 // Create many docs efficiently in batches (≤450/commit). Returns new ids in
-// the same order as `items`. Used by the LinkedIn importer.
-export async function bulkCreate(col, items) {
+// the same order as `items`. Used by the LinkedIn importer. Optional
+// onProgress(done, total) fires after each batch commits, for progress UI.
+export async function bulkCreate(col, items, onProgress) {
   const ids = [];
-  let batch = writeBatch(db), n = 0;
+  let batch = writeBatch(db), n = 0, done = 0;
   const space = requireSpace(), by = uid();
+  const total = items.length;
   for (const item of items) {
     const ref = doc(collection(db, col));
     batch.set(ref, { ...item, spaceId: space, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), createdBy: by });
     ids.push(ref.id);
-    if (++n >= 450) { await batch.commit(); batch = writeBatch(db); n = 0; }
+    done++;
+    if (++n >= 450) { await batch.commit(); batch = writeBatch(db); n = 0; if (onProgress) onProgress(done, total); }
   }
   if (n) await batch.commit();
+  if (onProgress) onProgress(done, total);
   return ids;
 }
 

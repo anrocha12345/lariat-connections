@@ -179,6 +179,22 @@ tbody tr:hover { background: var(--bg); }
 .toast.show { opacity: 1; }
 .toast--err { background: var(--danger); }
 
+/* ── Background job tray ─────────────────────────────────────────────────── */
+.job-tray {
+  position: fixed; right: 20px; bottom: 20px; z-index: 150;
+  display: flex; flex-direction: column; gap: 10px; max-width: 320px;
+}
+.job-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow); padding: 13px 15px; font-size: 0.85rem;
+}
+.job-card__head { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.job-card__bar { height: 5px; border-radius: 3px; background: var(--bg); margin-top: 9px; overflow: hidden; }
+.job-card__bar-fill { height: 100%; background: var(--primary); transition: width 0.3s ease; }
+.job-card--done .job-card__bar-fill  { background: var(--ok); }
+.job-card--error .job-card__bar-fill { background: var(--danger); }
+.job-card__msg { color: var(--text-light); font-size: 0.78rem; margin-top: 5px; }
+
 /* ── Spinner ─────────────────────────────────────────────────────────────── */
 .spinner { display: inline-block; width: 15px; height: 15px; border: 2px solid rgba(255,255,255,0.4);
   border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; }

@@ -46,9 +46,13 @@
     </div>
   </div>
 
+  <div class="job-tray hidden" id="jobTray"></div>
+
   <script type="module">
     import { requireAuth, doSignOut } from "./js/auth.js";
     import { IS_CONFIGURED } from "./js/firebase-config.js";
+    import { escHtml } from "./js/data.js";
+    import { subscribe as subscribeJobs } from "./js/jobs.js";
 
     const content   = document.getElementById("content");
     const titleEl   = document.getElementById("viewTitle");
@@ -75,6 +79,24 @@
     const ctx = await requireAuth();
     document.getElementById("userEmail").textContent = ctx.user.email || "";
     document.getElementById("signOutBtn").onclick = doSignOut;
+
+    // Persistent background-job tray — lives in the shell (not `content`), so
+    // it survives view navigation and shows import progress from any page.
+    const jobTray = document.getElementById("jobTray");
+    subscribeJobs((jobs) => {
+      if (!jobs.length) { jobTray.classList.add("hidden"); jobTray.innerHTML = ""; return; }
+      jobTray.classList.remove("hidden");
+      jobTray.innerHTML = jobs.map((j) => {
+        const pct = j.total ? Math.round((j.progress / j.total) * 100) : (j.status === "running" ? 20 : 100);
+        const cls = j.status === "done" ? "job-card--done" : j.status === "error" ? "job-card--error" : "";
+        const icon = j.status === "done" ? "✓" : j.status === "error" ? "✕" : '<span class="spinner spinner--dark" style="width:12px;height:12px"></span>';
+        return `<div class="job-card ${cls}">
+          <div class="job-card__head">${icon} ${escHtml(j.label)}</div>
+          <div class="job-card__bar"><div class="job-card__bar-fill" style="width:${pct}%"></div></div>
+          <div class="job-card__msg">${escHtml(j.message || (j.total ? `${j.progress} / ${j.total}` : "Working…"))}</div>
+        </div>`;
+      }).join("");
+    });
 
     let currentCleanup = null;
 
