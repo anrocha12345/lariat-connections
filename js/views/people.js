@@ -239,7 +239,8 @@ function renderDetail(id) {
 
       <div class="stack">
         <div class="card">
-          <h3 style="font-size:1.05rem">Snapshot</h3>
+          <div class="spread"><h3 style="font-size:1.05rem">Snapshot</h3>
+            <button class="btn btn--ghost btn--sm" id="editSnapshotBtn" title="Edit next contact, how/where you met, birthday…">✎ Edit</button></div>
           <div class="stack" style="margin-top:10px">
             ${infoRow("Last contact", lt ? fmtDate(lt) : "—")}
             ${infoRow("Next contact", nc ? fmtDate(nc) : "—")}
@@ -250,7 +251,8 @@ function renderDetail(id) {
           </div>
         </div>
         <div class="card">
-          <h3 style="font-size:1.05rem">Contact</h3>
+          <div class="spread"><h3 style="font-size:1.05rem">Contact</h3>
+            <button class="btn btn--ghost btn--sm" id="editContactBtn" title="Edit emails and phone numbers">✎ Edit</button></div>
           <div class="stack" style="margin-top:10px">
             ${(p.emails || []).map((e) => infoRow("Email", `<a href="mailto:${escHtml(e)}">${escHtml(e)}</a>`)).join("") || infoRow("Email", "—")}
             ${(p.phones || []).map((ph) => infoRow("Phone", escHtml(ph))).join("") || ""}
@@ -270,6 +272,8 @@ function renderDetail(id) {
     </div>`;
 
   S.content.querySelector("#editBtn").onclick = () => openPersonModal(p);
+  S.content.querySelector("#editSnapshotBtn").onclick = () => openPersonModal(p);
+  S.content.querySelector("#editContactBtn").onclick = () => openPersonModal(p);
   S.content.querySelector("#logBtn").onclick = () => openInteractionModal([id]);
   S.content.querySelector("#delBtn").onclick = async () => {
     if (await confirmDialog(`Delete ${displayName(p)}? This removes their profile.`, { danger: true, okLabel: "Delete" })) {
