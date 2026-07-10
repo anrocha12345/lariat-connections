@@ -50,6 +50,10 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 600; color: var(--text
 .btn--accent { background: var(--accent); }
 .btn--accent:hover { background: #244b3e; }
 .btn--danger { background: var(--danger); }
+/* Ghost + danger together = an outlined red button, not a solid one — higher
+   specificity than .btn--danger alone so it wins regardless of class order. */
+.btn--ghost.btn--danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+.btn--ghost.btn--danger:hover { background: #FBE9E9; }
 .btn--sm { padding: 6px 11px; font-size: 0.82rem; }
 .btn--block { width: 100%; justify-content: center; }
 

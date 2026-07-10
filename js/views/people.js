@@ -222,8 +222,8 @@ function renderDetail(id) {
               </div>
             </div>
             <div class="row">
-              <button class="btn btn--ghost btn--sm" id="editBtn">Edit</button>
-              <button class="btn btn--ghost btn--sm btn--danger" id="delBtn" style="color:var(--danger)">Delete</button>
+              <button class="btn btn--sm" id="editBtn">✎ Edit</button>
+              <button class="btn btn--ghost btn--sm btn--danger" id="delBtn">Delete</button>
             </div>
           </div>
           <div style="margin-top:14px">${(p.tags || []).map(tagChip).join(" ")}</div>
