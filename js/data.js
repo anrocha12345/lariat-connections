@@ -177,6 +177,107 @@ export async function linkAttendees(personIds, opts = {}) {
       await upsertRelationship(ids[i], ids[j], opts);
 }
 
+// ── Deduplication ────────────────────────────────────────────────────────────
+// A stable identity key for a person. Prefers the LinkedIn URL; falls back to
+// name + company + email so URL-less connections don't re-import as duplicates.
+export function dedupeKey({ linkedinUrl, name, company, email }) {
+  const u = canonicalLinkedinUrl(linkedinUrl);
+  if (u) return "u:" + u;
+  const n = (name || "").trim().toLowerCase().replace(/\s+/g, " ");
+  if (!n) return null;
+  const c = normalizeCompany(company || "");
+  const e = (email || "").trim().toLowerCase();
+  return "n:" + n + "|" + c + "|" + e;
+}
+export function personDedupeKey(p) {
+  return dedupeKey({
+    linkedinUrl: p.linkedinUrl,
+    name: p.displayName || `${p.firstName || ""} ${p.lastName || ""}`,
+    company: p.currentCompanyName,
+    email: (p.emails || [])[0],
+  });
+}
+// A name-based key is only safe to auto-merge if there's a company or email to
+// corroborate it (avoids merging two different same-name people).
+function isStrongKey(key, p) {
+  if (!key) return false;
+  if (key.startsWith("u:")) return true;
+  const c = normalizeCompany(p.currentCompanyName || "");
+  const e = (p.emails || [])[0] || "";
+  return !!(c || e);
+}
+
+// Read-only: find groups of duplicate people. Keeps the earliest as the survivor.
+export async function scanDuplicates() {
+  const people = await listBySpace(COLLECTIONS.people);
+  const groups = new Map();
+  for (const p of people) {
+    const k = personDedupeKey(p);
+    if (!isStrongKey(k, p)) continue;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(p);
+  }
+  const out = [];
+  for (const [key, arr] of groups) {
+    if (arr.length < 2) continue;
+    arr.sort((a, b) => (tsToDate(a.createdAt) || 0) - (tsToDate(b.createdAt) || 0));
+    out.push({ key, keep: arr[0], dups: arr.slice(1) });
+  }
+  return out;
+}
+
+// Merge duplicates: reassign each duplicate's experiences / interactions /
+// relationships onto the survivor, then delete the duplicate person. Sub-records
+// are de-duplicated so a survivor doesn't end up with two identical roles/links.
+export async function mergeDuplicates(dupGroups) {
+  const remap = new Map();
+  dupGroups.forEach((g) => g.dups.forEach((d) => remap.set(d.id, g.keep.id)));
+  if (!remap.size) return { merged: 0, groups: 0 };
+
+  const [exps, inters, rels] = await Promise.all([
+    listBySpace(COLLECTIONS.experiences),
+    listBySpace(COLLECTIONS.interactions),
+    listBySpace(COLLECTIONS.relationships),
+  ]);
+
+  let batch = writeBatch(db), n = 0;
+  const flush = async () => { if (++n >= 400) { await batch.commit(); batch = writeBatch(db); n = 0; } };
+
+  // Experiences — avoid duplicating a company the survivor already has.
+  const keepCos = new Map();
+  exps.forEach((e) => { if (!remap.has(e.personId)) { (keepCos.get(e.personId) || keepCos.set(e.personId, new Set()).get(e.personId)).add(e.companyId); } });
+  for (const e of exps) {
+    if (!remap.has(e.personId)) continue;
+    const keepId = remap.get(e.personId);
+    const set = keepCos.get(keepId) || (keepCos.set(keepId, new Set()).get(keepId));
+    if (set.has(e.companyId)) { batch.delete(doc(db, COLLECTIONS.experiences, e.id)); }
+    else { set.add(e.companyId); batch.update(doc(db, COLLECTIONS.experiences, e.id), { personId: keepId, updatedAt: serverTimestamp() }); }
+    await flush();
+  }
+  // Interactions — replace dup ids inside personIds arrays.
+  for (const it of inters) {
+    if (!(it.personIds || []).some((id) => remap.has(id))) continue;
+    const newIds = [...new Set((it.personIds || []).map((id) => remap.get(id) || id))];
+    batch.update(doc(db, COLLECTIONS.interactions, it.id), { personIds: newIds, updatedAt: serverTimestamp() });
+    await flush();
+  }
+  // Relationships — remap endpoints, drop self-loops and duplicate pairs.
+  const seen = new Set(rels.filter((r) => !remap.has(r.personA) && !remap.has(r.personB)).map((r) => r.pairKey));
+  for (const r of rels) {
+    if (!remap.has(r.personA) && !remap.has(r.personB)) continue;
+    const a = remap.get(r.personA) || r.personA, b = remap.get(r.personB) || r.personB;
+    if (a === b) { batch.delete(doc(db, COLLECTIONS.relationships, r.id)); await flush(); continue; }
+    const pk = pairKey(a, b);
+    if (seen.has(pk)) { batch.delete(doc(db, COLLECTIONS.relationships, r.id)); }
+    else { seen.add(pk); batch.update(doc(db, COLLECTIONS.relationships, r.id), { personA: [a, b].sort()[0], personB: [a, b].sort()[1], pairKey: pk, updatedAt: serverTimestamp() }); }
+    await flush();
+  }
+  // Delete duplicate people.
+  for (const dupId of remap.keys()) { batch.delete(doc(db, COLLECTIONS.people, dupId)); await flush(); }
+  if (n) await batch.commit();
+  return { merged: remap.size, groups: dupGroups.length };
+}
+
 // ── Companies & experiences ──────────────────────────────────────────────────
 // Find a company by normalised name within the space, or create it.
 export async function upsertCompany(name) {

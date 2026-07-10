@@ -3,9 +3,10 @@
 // Space name, stats, CSV export (formula-injection safe), and sharing info.
 // ─────────────────────────────────────────────────────────────────────────
 import {
-  COLLECTIONS, listBySpace, updateDoc, getActiveSpace, downloadCsv, escHtml, fmtDate, tsToDate,
+  COLLECTIONS, listBySpace, updateDoc, getActiveSpace, downloadCsv,
+  scanDuplicates, mergeDuplicates, escHtml, fmtDate, tsToDate,
 } from "../data.js";
-import { toast } from "../ui.js";
+import { toast, confirmDialog } from "../ui.js";
 
 export async function mount({ content, ctx }) {
   content.innerHTML = `<div class="empty"><span class="spinner spinner--dark"></span> Loading…</div>`;
@@ -44,6 +45,13 @@ export async function mount({ content, ctx }) {
       </div>
 
       <div class="card">
+        <h3>Clean up duplicates</h3>
+        <p class="muted small" style="margin:6px 0 14px">Finds people imported more than once — including connections with no LinkedIn URL — and merges them, keeping the earliest record and moving its notes, meetings and links onto it.</p>
+        <button class="btn btn--ghost" id="scanDupes">Scan for duplicates</button>
+        <div id="dupeResult" style="margin-top:12px"></div>
+      </div>
+
+      <div class="card">
         <h3>Sharing <span class="badge">coming later</span></h3>
         <p class="muted small" style="margin-top:6px">Your data model is already multi-user ready: a space has members. When you want to share this
         network with a trusted friend, we add their account to this space — no migration needed. Or they start their own space.</p>
@@ -56,6 +64,37 @@ export async function mount({ content, ctx }) {
     try { await updateDoc(COLLECTIONS.spaces, getActiveSpace(), { name }); toast("Saved"); }
     catch (err) { toast("Failed: " + err.message, true); }
     finally { btn.disabled = false; }
+  };
+
+  content.querySelector("#scanDupes").onclick = async (e) => {
+    const btn = e.target, res = content.querySelector("#dupeResult");
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Scanning…';
+    try {
+      const groups = await scanDuplicates();
+      const dupCount = groups.reduce((s, g) => s + g.dups.length, 0);
+      if (!dupCount) {
+        res.innerHTML = '<span class="badge badge--ok">No duplicates found 🎉</span>';
+      } else {
+        res.innerHTML = `
+          <p>Found <strong>${dupCount}</strong> duplicate record${dupCount === 1 ? "" : "s"} across ${groups.length} ${groups.length === 1 ? "person" : "people"}:</p>
+          <ul class="muted small" style="margin:8px 0 12px 18px">
+            ${groups.slice(0, 8).map((g) => `<li>${escHtml(g.keep.displayName || "(no name)")} — ${g.dups.length + 1} copies</li>`).join("")}
+            ${groups.length > 8 ? `<li>…and ${groups.length - 8} more</li>` : ""}
+          </ul>
+          <button class="btn btn--danger" id="mergeDupes">Merge ${dupCount} duplicate${dupCount === 1 ? "" : "s"}</button>`;
+        res.querySelector("#mergeDupes").onclick = async (ev) => {
+          const ok = await confirmDialog(`Merge ${dupCount} duplicate record(s)? Their notes, meetings and links move onto the kept person. This can't be undone.`, { danger: true, okLabel: "Merge" });
+          if (!ok) return;
+          const b2 = ev.target; b2.disabled = true; b2.innerHTML = '<span class="spinner"></span> Merging…';
+          try {
+            const r = await mergeDuplicates(groups);
+            toast(`Merged ${r.merged} duplicates`);
+            res.innerHTML = `<span class="badge badge--ok">Done — merged ${r.merged} record(s). Refresh other views to see the change.</span>`;
+          } catch (err) { console.error(err); toast("Merge failed: " + err.message, true); b2.disabled = false; b2.textContent = "Retry merge"; }
+        };
+      }
+    } catch (err) { console.error(err); toast("Scan failed: " + err.message, true); res.innerHTML = ""; }
+    finally { btn.disabled = false; btn.textContent = "Scan for duplicates"; }
   };
 
   content.querySelector("#exportPeople").onclick = () => {

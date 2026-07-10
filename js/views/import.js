@@ -7,7 +7,7 @@
 import Papa from "https://esm.sh/papaparse@5.4.1";
 import {
   COLLECTIONS, listBySpace, bulkCreate, updateDoc, where,
-  canonicalLinkedinUrl, normalizeCompany, escHtml, fmtDate, tsToDate,
+  canonicalLinkedinUrl, normalizeCompany, dedupeKey, personDedupeKey, escHtml, fmtDate, tsToDate,
 } from "../data.js";
 import { toast } from "../ui.js";
 
@@ -68,10 +68,19 @@ function wireConnections(input, preview) {
 
     const [people, companies] = await Promise.all([listBySpace(COLLECTIONS.people), listBySpace(COLLECTIONS.companies)]);
     existing = {
-      urls: new Set(people.map((p) => canonicalLinkedinUrl(p.linkedinUrl)).filter(Boolean)),
+      keys: new Set(people.map(personDedupeKey).filter(Boolean)),
       companyMap: new Map(companies.map((c) => [c.normalizedName, c.id])),
     };
-    const news = parsed.filter((r) => { const u = canonicalLinkedinUrl(r.url); return !u || !existing.urls.has(u); });
+    // Dedupe against what's already imported AND within this file. URL-less rows
+    // fall back to name+company+email so they don't re-import as duplicates.
+    const seen = new Set();
+    const news = [];
+    for (const r of parsed) {
+      const k = dedupeKey({ linkedinUrl: r.url, name: `${r.firstName} ${r.lastName}`, company: r.company, email: r.email });
+      if (k && (existing.keys.has(k) || seen.has(k))) continue;
+      if (k) seen.add(k);
+      news.push(r);
+    }
     const dups = parsed.length - news.length;
 
     preview.innerHTML = `
