@@ -86,8 +86,29 @@ function displayName(p) {
 }
 
 // ── List ─────────────────────────────────────────────────────────────────────
+const COLUMNS = [
+  { key: "name", label: "Name" },
+  { key: "company", label: "Company" },
+  { key: "tags", label: "Tags" },
+  { key: "lastContact", label: "Last contact" },
+  { key: "nextContact", label: "Next contact" },
+];
+
+function sortValue(row, key) {
+  switch (key) {
+    case "name": return displayName(row.p).toLowerCase();
+    case "company": return (row.p.currentCompanyName || "").toLowerCase();
+    case "tags": return (row.p.tags || []).join(", ").toLowerCase();
+    case "lastContact": return row.lt ? row.lt.getTime() : null;
+    case "nextContact": return row.nc ? row.nc.getTime() : null;
+    default: return "";
+  }
+}
+
 function renderList() {
   const tags = allTags();
+  S.sortField = S.sortField || "name";
+  S.sortDir = S.sortDir || 1;
   S.content.innerHTML = `
     <div class="toolbar">
       <input class="search-input" id="peopleSearch" placeholder="Search name, company, email…">
@@ -96,7 +117,7 @@ function renderList() {
       <div class="toolbar__spacer"></div>
       <span class="muted small">${S.people.length} contact${S.people.length === 1 ? "" : "s"}</span>
     </div>
-    <div class="card" style="padding:0" id="peopleTableWrap"></div>`;
+    <div class="card table-scroll" style="padding:0" id="peopleTableWrap"></div>`;
 
   const wrap = S.content.querySelector("#peopleTableWrap");
   const search = S.content.querySelector("#peopleSearch");
@@ -105,14 +126,25 @@ function renderList() {
   function draw() {
     const q = search.value.trim().toLowerCase();
     const tf = tagFilter.value;
-    let rows = S.people.filter((p) => {
+    const filtered = S.people.filter((p) => {
       if (tf && !(p.tags || []).includes(tf)) return false;
       if (!q) return true;
       const hay = [displayName(p), p.currentCompanyName, p.currentTitle, (p.emails || []).join(" "), (p.tags || []).join(" ")]
         .join(" ").toLowerCase();
       return hay.includes(q);
     });
-    rows.sort((a, b) => displayName(a).localeCompare(displayName(b)));
+    const rows = filtered.map((p) => ({ p, lt: lastTouch(p.id), nc: nextContact(p) }));
+
+    rows.sort((a, b) => {
+      const av = sortValue(a, S.sortField), bv = sortValue(b, S.sortField);
+      // Rows with no value for the sorted column (e.g. no last-contact date)
+      // always sink to the bottom, regardless of sort direction.
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (typeof av === "number") return (av - bv) * S.sortDir;
+      return av.localeCompare(bv) * S.sortDir;
+    });
 
     if (!rows.length) {
       wrap.innerHTML = `<div class="empty"><div class="empty__icon">👋</div>
@@ -120,15 +152,23 @@ function renderList() {
         <p class="muted">${S.people.length ? "Try a different search." : "Add someone, or import your LinkedIn connections."}</p></div>`;
       return;
     }
+
+    const arrow = (key) => S.sortField === key ? `<span class="sort-arrow">${S.sortDir === 1 ? "▲" : "▼"}</span>` : "";
     wrap.innerHTML = `<table><thead><tr>
-        <th>Name</th><th>Company</th><th>Tags</th><th>Last contact</th><th>Next contact</th>
+        ${COLUMNS.map((c) => `<th class="sortable" data-sort="${c.key}">${escHtml(c.label)}${arrow(c.key)}</th>`).join("")}
       </tr></thead><tbody>${rows.map(rowHtml).join("")}</tbody></table>`;
+
     wrap.querySelectorAll("tr[data-id]").forEach((tr) =>
       tr.onclick = () => S.go("people", { id: tr.dataset.id }));
+    wrap.querySelectorAll("th[data-sort]").forEach((th) =>
+      th.onclick = () => {
+        const key = th.dataset.sort;
+        if (S.sortField === key) S.sortDir *= -1; else { S.sortField = key; S.sortDir = 1; }
+        draw();
+      });
   }
 
-  function rowHtml(p) {
-    const lt = lastTouch(p.id), nc = nextContact(p);
+  function rowHtml({ p, lt, nc }) {
     return `<tr class="row-click" data-id="${p.id}">
       <td><div class="row">${avatarHtml(p)}<div>
         <div style="font-weight:600">${escHtml(displayName(p))}</div>

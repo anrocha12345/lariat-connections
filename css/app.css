@@ -23,6 +23,7 @@
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { overflow-y: scroll; }
+html, body { overflow-x: hidden; max-width: 100%; }
 body {
   font-family: var(--font-sans);
   background: var(--bg);
@@ -91,11 +92,15 @@ textarea { resize: vertical; min-height: 80px; }
 .badge--warn { background: #FBF2DE; color: var(--warn); border-color: #EBD9AE; }
 
 /* ── Tables ──────────────────────────────────────────────────────────────── */
+.table-scroll { overflow-x: auto; max-width: 100%; }
 table { width: 100%; border-collapse: collapse; }
-th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--border); font-size: 0.9rem;
+  word-break: break-word; }
 th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-light);
-  font-weight: 700; cursor: default; }
+  font-weight: 700; cursor: default; white-space: nowrap; }
 th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--primary); }
+th.sortable .sort-arrow { margin-left: 3px; opacity: 0.7; }
 tbody tr { transition: background 0.12s ease; }
 tbody tr:hover { background: var(--bg); }
 .row-click { cursor: pointer; }

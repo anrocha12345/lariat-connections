@@ -37,7 +37,7 @@ function renderList() {
       <div class="toolbar__spacer"></div>
       <span class="muted small">${S.companies.length} companies</span>
     </div>
-    <div class="card" style="padding:0" id="coWrap"></div>`;
+    <div class="card table-scroll" style="padding:0" id="coWrap"></div>`;
   const wrap = S.content.querySelector("#coWrap");
   const search = S.content.querySelector("#coSearch");
 
